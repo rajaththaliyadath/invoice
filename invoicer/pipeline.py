@@ -135,9 +135,14 @@ def convert_xlsx_to_pdf(xlsx_path: Path, pdf_path: Path) -> None:
             return
         except RuntimeError as exc:
             sys.stderr.write(f"{exc}\n")
+    hint = (
+        "On Debian/Ubuntu: sudo apt update && sudo apt install -y libreoffice-calc-nogui"
+        if sys.platform.startswith("linux")
+        else "Install LibreOffice from https://www.libreoffice.org/download/download/"
+    )
     raise InvoiceError(
-        "Could not create PDF. Install LibreOffice or fix Numbers automation on macOS. "
-        "See https://www.libreoffice.org/download/download/"
+        "Could not create PDF. Install LibreOffice (soffice in PATH) for headless conversion. "
+        f"{hint}. On macOS you can use Numbers automation instead."
     )
 
 

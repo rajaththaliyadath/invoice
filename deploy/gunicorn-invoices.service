@@ -1,0 +1,15 @@
+[Unit]
+Description=Gunicorn for invoices (Django)
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/invoice
+EnvironmentFile=/var/www/invoice/.env
+ExecStart=/var/www/invoice/.venv/bin/gunicorn config.wsgi:application \
+    --bind 127.0.0.1:8001 --workers 1 --threads 4 --timeout 120
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

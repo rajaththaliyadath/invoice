@@ -1,0 +1,43 @@
+Paths below use /var/www/invoice — change if you use another directory.
+
+1) System packages (PDF on Linux requires LibreOffice):
+   sudo apt update
+   sudo apt install -y python3-venv nginx libreoffice-calc-nogui
+
+2) App directory (first time):
+   sudo mkdir -p /var/www && sudo chown $USER:$USER /var/www
+   cd /var/www
+   git clone https://github.com/rajaththaliyadath/invoice.git invoice
+   cd invoice
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+
+3) Environment:
+   cp deploy/env.example .env
+   nano .env   # set DJANGO_SECRET_KEY and hosts (invoices.rajatht.me)
+
+4) Django:
+   .venv/bin/python manage.py migrate --noinput
+   .venv/bin/python manage.py collectstatic --noinput
+   mkdir -p media/invoices
+
+5) Permissions (so Gunicorn user can write media):
+   sudo chown -R www-data:www-data /var/www/invoice/media
+   sudo chown -R www-data:www-data /var/www/invoice/db.sqlite3 2>/dev/null || true
+
+6) systemd:
+   sudo cp deploy/gunicorn-invoices.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now gunicorn-invoices
+
+7) Nginx: merge deploy/nginx-invoices.conf into your site config; use a unique port (8001) if another app already uses it.
+   sudo nginx -t && sudo systemctl reload nginx
+
+8) TLS:
+   sudo certbot --nginx -d invoices.rajatht.me
+
+Updates after git push:
+   cd /var/www/invoice && git pull && .venv/bin/pip install -r requirements.txt \
+   && .venv/bin/python manage.py migrate --noinput \
+   && .venv/bin/python manage.py collectstatic --noinput \
+   && sudo systemctl restart gunicorn-invoices

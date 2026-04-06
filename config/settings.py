@@ -64,6 +64,9 @@ DATABASES = {
         ssl_require=os.environ.get("DATABASE_SSL_REQUIRE", "").lower() in ("1", "true", "yes"),
     )
 }
+# SQLite + multiple Gunicorn workers causes lock errors; single worker is default in Procfile.
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    DATABASES["default"]["CONN_MAX_AGE"] = 0
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
@@ -93,3 +96,4 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
