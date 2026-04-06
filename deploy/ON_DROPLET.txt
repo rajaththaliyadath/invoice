@@ -17,8 +17,10 @@ Paths below use /var/www/invoice — change if you use another directory.
    nano .env   # set DJANGO_SECRET_KEY and hosts (invoices.rajatht.me)
 
 4) Django (SQLite must live in data/ writable by www-data):
-   mkdir -p /var/www/invoice/data /var/www/invoice/media/invoices
+   mkdir -p /var/www/invoice/data /var/www/invoice/media/invoices \
+     /var/www/invoice/.config /var/www/invoice/.cache /var/www/invoice/.local/share
    sudo chown www-data:www-data /var/www/invoice/data
+   sudo chown -R www-data:www-data /var/www/invoice/.config /var/www/invoice/.cache /var/www/invoice/.local
    sudo -u www-data bash -c 'cd /var/www/invoice && export $(grep -v "^#" .env | xargs) && .venv/bin/python manage.py migrate --noinput'
    .venv/bin/python manage.py collectstatic --noinput
 

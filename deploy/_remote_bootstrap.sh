@@ -28,8 +28,10 @@ fi
 chown www-data:www-data .env
 chmod 640 .env
 
-mkdir -p "$INV/data" "$INV/media/invoices"
+mkdir -p "$INV/data" "$INV/media/invoices" \
+  "$INV/.config" "$INV/.cache" "$INV/.local/share"
 chown www-data:www-data "$INV/data"
+chown -R www-data:www-data "$INV/.config" "$INV/.cache" "$INV/.local"
 # Migrations as www-data so SQLite + WAL files in data/ are owned correctly (avoids "readonly database").
 sudo -u www-data bash -c "cd \"$INV\" && export \$(grep -v '^#' .env | xargs) && .venv/bin/python manage.py migrate --noinput"
 

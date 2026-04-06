@@ -6,6 +6,12 @@ After=network.target
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/invoice
+# www-data's login home is /var/www (root-owned). LibreOffice needs a writable HOME + XDG dirs.
+Environment=HOME=/var/www/invoice
+Environment=XDG_CONFIG_HOME=/var/www/invoice/.config
+Environment=XDG_CACHE_HOME=/var/www/invoice/.cache
+Environment=XDG_DATA_HOME=/var/www/invoice/.local/share
+Environment=SAL_USE_VCLPLUGIN=headless
 EnvironmentFile=/var/www/invoice/.env
 ExecStart=/var/www/invoice/.venv/bin/gunicorn config.wsgi:application \
     --bind 127.0.0.1:8001 --workers 1 --threads 4 --timeout 120 \
