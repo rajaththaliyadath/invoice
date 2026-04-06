@@ -1,0 +1,133 @@
+{% extends "invoicer/base.html" %}
+{% block title %}Delivery lines{% endblock %}
+{% block content %}
+<div class="surface-card mb-6">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div class="flex items-start gap-3">
+      <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+        <i data-lucide="package" class="h-5 w-5" aria-hidden="true"></i>
+      </span>
+      <div>
+        <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Step 2 — Parcels by day</h1>
+        <p class="mt-2 inline-flex flex-wrap items-center gap-2 text-sm text-slate-600">
+          <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 font-medium text-slate-800">
+            <i data-lucide="calendar-range" class="h-4 w-4 text-slate-500" aria-hidden="true"></i>
+            {{ week_monday|date:"d/m/Y" }} (Mon) – {{ week_end|date:"d/m/Y" }} (Sun)
+          </span>
+        </p>
+        {% if reference_date_display %}
+          <p class="mt-2 text-sm text-slate-600">
+            <span class="font-medium text-slate-800">Your week anchor date (step 1):</span>
+            {{ reference_date_display }} — pre-selected below for the next line.
+          </p>
+        {% endif %}
+        <p class="mt-2 text-sm text-slate-500">Delivery date is limited to these seven days. After you add a line, the next day in the week is selected automatically.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="surface-card mb-6">
+  <h2 class="mb-4 flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900">
+    {% if editing_index is not None %}
+      <i data-lucide="pencil" class="h-5 w-5 text-amber-600" aria-hidden="true"></i>
+      Edit line {{ editing_index|add:1 }}
+    {% else %}
+      <i data-lucide="plus-circle" class="h-5 w-5 text-emerald-600" aria-hidden="true"></i>
+      Add a line
+    {% endif %}
+  </h2>
+  <form method="post" action="" class="space-y-5" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="{% if editing_index is not None %}save_line{% else %}add{% endif %}">
+    {% if editing_index is not None %}
+      <input type="hidden" name="line_index" value="{{ editing_index }}">
+    {% endif %}
+    {% for field in form %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}
+          <ul class="mt-1 list-none space-y-0.5 text-sm text-red-600">
+            {% for err in field.errors %}<li>{{ err }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" class="btn btn-primary w-full sm:w-auto">
+        {% if editing_index is not None %}
+          <i data-lucide="save" class="mr-2 h-5 w-5" aria-hidden="true"></i>
+          Update line
+        {% else %}
+          <i data-lucide="plus" class="mr-2 h-5 w-5" aria-hidden="true"></i>
+          Add line
+        {% endif %}
+      </button>
+      {% if editing_index is not None %}
+        <a href="{% url 'invoicer:entries' %}" class="btn btn-secondary">Cancel edit</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if rows %}
+<div class="surface-card">
+  <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+    <i data-lucide="list-checks" class="h-5 w-5 text-violet-600" aria-hidden="true"></i>
+    Lines so far <span class="text-base font-normal text-slate-500">({{ rows|length }} / 9)</span>
+  </h2>
+  <div class="overflow-x-auto rounded-xl border border-slate-200">
+    <table class="w-full min-w-[320px] text-left text-sm">
+      <thead>
+        <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <th class="px-4 py-3">Date</th>
+          <th class="px-4 py-3">Parcels</th>
+          <th class="px-4 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 bg-white">
+        {% for r in rows %}
+          <tr class="text-slate-800">
+            <td class="px-4 py-3">{{ r.label|default:r.d }}</td>
+            <td class="px-4 py-3 font-medium tabular-nums">{{ r.p }}</td>
+            <td class="px-4 py-3 text-right">
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <a href="{% url 'invoicer:entries' %}?edit={{ forloop.counter0 }}" class="inline-flex min-h-[2.5rem] touch-manipulation items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                  <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                  Edit
+                </a>
+                <form method="post" action="" class="inline" onsubmit="return confirm('Remove this line?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="line_index" value="{{ forloop.counter0 }}">
+                  <button type="submit" class="inline-flex min-h-[2.5rem] touch-manipulation items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                    <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="" class="mt-6 border-t border-slate-100 pt-6">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="finish">
+    <button type="submit" class="btn btn-primary w-full sm:w-auto">
+      <i data-lucide="file-check-2" class="mr-2 h-5 w-5" aria-hidden="true"></i>
+      Finish
+    </button>
+  </form>
+</div>
+{% else %}
+<div class="surface-card border-dashed border-slate-300 bg-slate-50/80">
+  <p class="flex items-start gap-2 text-sm text-slate-600">
+    <i data-lucide="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true"></i>
+    Add at least one line, then press <strong class="font-medium text-slate-800">Finish</strong> to build your files.
+  </p>
+</div>
+{% endif %}
+{% endblock %}

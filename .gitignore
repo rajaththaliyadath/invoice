@@ -1,0 +1,11 @@
+node_modules/
+staticfiles/
+__pycache__/
+*.pyc
+.DS_Store
+db.sqlite3
+.venv/
+media/invoices/
+*.numbers~
+/output.pdf
+/output.xlsx

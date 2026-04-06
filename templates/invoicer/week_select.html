@@ -1,0 +1,41 @@
+{% extends "invoicer/base.html" %}
+{% block title %}Choose week{% endblock %}
+{% block content %}
+<div class="surface-card">
+  <div class="mb-6 flex items-start gap-3">
+    <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+      <i data-lucide="calendar-days" class="h-5 w-5" aria-hidden="true"></i>
+    </span>
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Step 1 — Your week</h1>
+      <p class="mt-1 text-sm leading-relaxed text-slate-600 sm:text-base">Choose <strong class="font-medium text-slate-800">any single day</strong> in the week you are invoicing (Australia: Monday–Sunday). On the next step you will only pick delivery dates inside that week.</p>
+    </div>
+  </div>
+
+  <form method="post" action="" class="space-y-5" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <ul class="list-none rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        {% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% for field in form %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}
+          <p class="mt-1 text-sm text-slate-500" id="{{ field.id_for_label }}_helptext">{{ field.help_text }}</p>
+        {% endif %}
+        {% if field.errors %}
+          <ul class="mt-1 list-none space-y-0.5 text-sm text-red-600">
+            {% for err in field.errors %}<li>{{ err }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <div class="flex flex-wrap gap-3 pt-2">
+      <button type="submit" class="btn btn-primary w-full sm:w-auto">Continue</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

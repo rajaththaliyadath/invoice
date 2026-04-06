@@ -1,0 +1,39 @@
+{% extends "invoicer/base.html" %}
+{% block title %}Done{% endblock %}
+{% block content %}
+<div class="surface-card">
+  <div class="mb-6 flex items-start gap-3">
+    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+      <i data-lucide="circle-check" class="h-7 w-7" aria-hidden="true"></i>
+    </span>
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Invoice ready</h1>
+      {% if invoice_no %}
+        <p class="mt-2 text-sm text-slate-600">Invoice number <span class="font-semibold tabular-nums text-slate-900">(F3): {{ invoice_no }}</span></p>
+      {% endif %}
+    </div>
+  </div>
+
+  <p class="mb-3 text-sm font-medium text-slate-700">Downloads</p>
+  <ul class="space-y-3">
+    <li>
+      <a href="{% url 'invoicer:download' 'pdf' %}" class="group flex min-h-[2.75rem] touch-manipulation items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 sm:min-h-0">
+        <i data-lucide="file-down" class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true"></i>
+        <span class="min-w-0 truncate">{{ pdf_name }}</span>
+        <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
+      </a>
+    </li>
+    <li>
+      <a href="{% url 'invoicer:download' 'xlsx' %}" class="group flex min-h-[2.75rem] touch-manipulation items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-sky-700 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 sm:min-h-0">
+        <i data-lucide="file-spreadsheet" class="h-5 w-5 shrink-0 text-sky-600" aria-hidden="true"></i>
+        <span class="min-w-0 truncate">{{ xlsx_name }}</span>
+        <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
+      </a>
+    </li>
+  </ul>
+
+  <div class="mt-8 border-t border-slate-100 pt-6">
+    <a href="{% url 'invoicer:week_select' %}?reset=1" class="btn btn-secondary w-full sm:w-auto">Start a new invoice</a>
+  </div>
+</div>
+{% endblock %}
