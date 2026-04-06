@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 
 # Tailwind utility classes (compiled into static/invoicer/css/app.css).
 _CONTROL = (
@@ -12,7 +13,7 @@ _CONTROL = (
 class WeekAnchorForm(forms.Form):
     reference_date = forms.DateField(
         label="Pick any day in the week you are invoicing",
-        help_text="Australian week runs Monday–Sunday. Any day in that week is fine.",
+        help_text="Australian week runs Monday–Sunday. Only today or past dates — future days are disabled.",
         widget=forms.DateInput(
             attrs={
                 "type": "date",
@@ -20,6 +21,17 @@ class WeekAnchorForm(forms.Form):
             }
         ),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        today = timezone.localdate().isoformat()
+        self.fields["reference_date"].widget.attrs["max"] = today
+
+    def clean_reference_date(self):
+        d = self.cleaned_data["reference_date"]
+        if d > timezone.localdate():
+            raise forms.ValidationError("Choose today or an earlier date.")
+        return d
 
 
 class DeliveryLineForm(forms.Form):
@@ -30,10 +42,14 @@ class DeliveryLineForm(forms.Form):
     parcels = forms.IntegerField(
         min_value=1,
         label="Number of parcels",
-        widget=forms.NumberInput(
+        widget=forms.TextInput(
             attrs={
-                "class": f"{_CONTROL} no-spinner",
-                "min": 1,
+                "class": f"{_CONTROL} no-spinner tabular-nums",
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "autocomplete": "off",
+                "placeholder": "e.g. 12",
+                "title": "Digits only (whole number)",
             }
         ),
     )
@@ -43,9 +59,12 @@ class DeliveryLineForm(forms.Form):
         if week_days_iso:
             from datetime import date
 
+            today = timezone.localdate()
             choices = []
             for iso in week_days_iso:
                 d = date.fromisoformat(iso)
+                if d > today:
+                    continue
                 label = f"{d.strftime('%A')} {d.strftime('%d/%m/%Y')}"
                 choices.append((iso, label))
             self.fields["delivery_date"].choices = choices

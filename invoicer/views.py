@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .invoice_tasks import process_invoice_job
@@ -26,6 +27,7 @@ SESSION_ROWS = "invoice_rows"
 SESSION_REF_DATE = "invoice_reference_date"
 SESSION_FORM_DEFAULT_DATE = "invoice_form_default_date"
 SESSION_ACTIVE_JOB = "invoice_active_job"
+SESSION_INCLUDE_GST = "invoice_include_gst"
 
 
 def _week_day_isos(monday: date) -> list[str]:
@@ -38,6 +40,34 @@ def _next_day_in_week(d: date, week_monday: date) -> date:
     if d >= week_end:
         return week_monday
     return d + timedelta(days=1)
+
+
+def _selectable_days_in_week(week_monday: date) -> list[str]:
+    """ISO dates Mon–Sun of the week that are today or earlier (no future delivery days)."""
+    today = timezone.localdate()
+    week_end = week_monday + timedelta(days=6)
+    out: list[str] = []
+    d = week_monday
+    while d <= week_end:
+        if d <= today:
+            out.append(d.isoformat())
+        d += timedelta(days=1)
+    return out
+
+
+def _next_delivery_default_after(d: date, week_monday: date) -> date:
+    """Next calendar day in the week for a new line, capped to not go past today."""
+    today = timezone.localdate()
+    nxt = _next_day_in_week(d, week_monday)
+    week_end = week_monday + timedelta(days=6)
+    if nxt <= today and nxt <= week_end:
+        return nxt
+    valid = [
+        week_monday + timedelta(days=i)
+        for i in range(7)
+        if week_monday + timedelta(days=i) <= today
+    ]
+    return max(valid) if valid else d
 
 
 def _row_dict(d_iso: str, parcels: int) -> dict:
@@ -75,6 +105,7 @@ def week_select(request):
             request.session[SESSION_WEEK] = mon.isoformat()
             request.session[SESSION_REF_DATE] = d.isoformat()
             request.session[SESSION_ROWS] = []
+            request.session[SESSION_INCLUDE_GST] = True
             request.session.pop(SESSION_FORM_DEFAULT_DATE, None)
             request.session.pop(SESSION_ACTIVE_JOB, None)
             messages.success(
@@ -97,8 +128,15 @@ def entries(request):
 
     week_monday = date.fromisoformat(mon_iso)
     week_end = week_monday + timedelta(days=6)
-    day_isos = _week_day_isos(week_monday)
+    day_isos = _selectable_days_in_week(week_monday)
+    if not day_isos:
+        messages.error(
+            request,
+            "This week has no delivery days on or before today. Choose a different week in step 1.",
+        )
+        return redirect("invoicer:week_select")
     rows = request.session.get(SESSION_ROWS, [])
+    gst_included = bool(request.session.get(SESSION_INCLUDE_GST, True))
     ref_iso = request.session.get(SESSION_REF_DATE)
     default_iso = request.session.get(SESSION_FORM_DEFAULT_DATE)
 
@@ -139,10 +177,13 @@ def entries(request):
                 else:
                     d_iso = bound_form.cleaned_data["delivery_date"]
                     d = date.fromisoformat(d_iso)
+                    if d > timezone.localdate():
+                        messages.error(request, "Delivery date cannot be in the future.")
+                        return redirect("invoicer:entries")
                     rows = list(rows)
                     rows.append(_row_dict(d_iso, bound_form.cleaned_data["parcels"]))
                     request.session[SESSION_ROWS] = rows
-                    request.session[SESSION_FORM_DEFAULT_DATE] = _next_day_in_week(
+                    request.session[SESSION_FORM_DEFAULT_DATE] = _next_delivery_default_after(
                         d, week_monday
                     ).isoformat()
                     messages.success(request, "Line added.")
@@ -160,10 +201,13 @@ def entries(request):
                     return redirect("invoicer:entries")
                 d_iso = bound_form.cleaned_data["delivery_date"]
                 d = date.fromisoformat(d_iso)
+                if d > timezone.localdate():
+                    messages.error(request, "Delivery date cannot be in the future.")
+                    return redirect("invoicer:entries")
                 rows = list(rows)
                 rows[idx] = _row_dict(d_iso, bound_form.cleaned_data["parcels"])
                 request.session[SESSION_ROWS] = rows
-                request.session[SESSION_FORM_DEFAULT_DATE] = _next_day_in_week(
+                request.session[SESSION_FORM_DEFAULT_DATE] = _next_delivery_default_after(
                     d, week_monday
                 ).isoformat()
                 messages.success(request, "Line updated.")
@@ -173,7 +217,14 @@ def entries(request):
             if not rows:
                 messages.error(request, "Add at least one delivery line before finishing.")
                 return redirect("invoicer:entries")
+            today = timezone.localdate()
+            for row in rows:
+                if date.fromisoformat(row["d"]) > today:
+                    messages.error(request, "Remove or fix lines with a future delivery date before finishing.")
+                    return redirect("invoicer:entries")
             email = (request.POST.get("delivery_email") or "").strip()
+            include_gst = request.POST.get("include_gst") == "on"
+            request.session[SESSION_INCLUDE_GST] = include_gst
             if email:
                 try:
                     validate_email(email)
@@ -186,7 +237,7 @@ def entries(request):
             job = InvoiceJob.objects.create(
                 session_key=sid,
                 email=email,
-                rows_json=list(rows),
+                rows_json=[{**row, "gst": include_gst} for row in rows],
             )
             request.session[SESSION_ACTIVE_JOB] = str(job.public_id)
 
@@ -241,6 +292,7 @@ def entries(request):
             "reference_date_display": (
                 date.fromisoformat(ref_iso).strftime("%d/%m/%Y") if ref_iso else None
             ),
+            "gst_included": gst_included,
         },
     )
 

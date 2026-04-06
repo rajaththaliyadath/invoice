@@ -26,11 +26,17 @@ INVOICE_ASSET_DIR = _PROJECT_ROOT / "assets" / "invoice"
 class InvoiceError(Exception):
     """Raised when invoice generation fails (templates, PDF, validation)."""
 
-DATA_FIRST_ROW = 17
-DATA_LAST_ROW = 25
-SUM_ROW = 26
-DATE_LABEL_CELL = "B29"
-TABLE_HEADER_ROW = 16
+# Layout must match ``assets/invoice/Template.xlsx`` (adjust if you change the sheet).
+# Current template mapping:
+# - Invoice: G3
+# - Rate: G12
+# - Input rows: 14..20
+# - Totals: 21
+DATA_FIRST_ROW = 14
+DATA_LAST_ROW = 20
+SUM_ROW = 21
+DATE_VALUE_CELL = "B24"
+TABLE_HEADER_ROW = 13
 ALIGN_COLS = ("B", "C", "E", "F")
 
 CELL_CENTER = Alignment(horizontal="center", vertical="center")
@@ -39,22 +45,38 @@ CELL_LEFT = Alignment(horizontal="left", vertical="center")
 INVOICE_WEEK_1_MONDAY = date(2025, 6, 30)
 
 XLSX_NAMES = ("Template.xlsx", "template.xlsx")
-NUMBERS_NAMES = (
-    "invoice_template.numbers",
-    "Template.numbers",
-    "template.numbers",
-    "invoice template.numbers",
-    "Invoice Template.numbers",
-)
 
 
 def find_soffice() -> str | None:
-    mac = Path("/Applications/LibreOffice.app/Contents/MacOS/soffice")
-    if mac.is_file():
-        return str(mac)
+    """
+    Resolve the LibreOffice ``soffice`` binary.
+
+    Set ``INVOICE_SOFFICE`` to a full path if auto-detection fails (non-standard install).
+    """
+    env_path = os.environ.get("INVOICE_SOFFICE", "").strip()
+    if env_path:
+        p = Path(env_path).expanduser()
+        if p.is_file() and os.access(p, os.X_OK):
+            return str(p.resolve())
+    if sys.platform == "darwin":
+        for candidate in (
+            Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
+            Path.home() / "Applications/LibreOffice.app/Contents/MacOS/soffice",
+        ):
+            if candidate.is_file():
+                return str(candidate.resolve())
+        apps = Path("/Applications")
+        if apps.is_dir():
+            for app in sorted(apps.glob("LibreOffice*.app")):
+                sof = app / "Contents/MacOS/soffice"
+                if sof.is_file():
+                    return str(sof.resolve())
     win = Path(r"C:\Program Files\LibreOffice\program\soffice.exe")
     if win.is_file():
         return str(win)
+    win_alt = Path(r"C:\Program Files (x86)\LibreOffice\program\soffice.exe")
+    if win_alt.is_file():
+        return str(win_alt)
     for name in ("soffice", "libreoffice"):
         p = shutil.which(name)
         if p:
@@ -66,101 +88,71 @@ def _convert_xlsx_to_pdf_libreoffice(xlsx_path: Path, pdf_path: Path) -> bool:
     soffice = find_soffice()
     if not soffice:
         return False
+    # Isolated profile + SVP backend: avoid attaching to a running LibreOffice GUI and
+    # help the converter process exit instead of leaving the app open (common on macOS).
+    env = os.environ.copy()
+    env.setdefault("SAL_USE_VCLPLUGIN", "svp")
+    timeout_s = int(os.environ.get("INVOICE_LIBREOFFICE_TIMEOUT", "180"))
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
+        outdir = tmp / "out"
+        outdir.mkdir()
+        profile = tmp / "profile"
+        profile.mkdir()
+        user_inst = profile.resolve().as_uri()
         cmd = [
             soffice,
+            f"-env:UserInstallation={user_inst}",
             "--headless",
+            "--invisible",
+            "--norestore",
             "--nologo",
             "--nofirststartwizard",
             "--convert-to",
             "pdf",
             "--outdir",
-            str(tmp),
+            str(outdir),
             str(xlsx_path.resolve()),
         ]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        try:
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise InvoiceError(
+                f"LibreOffice PDF conversion timed out after {timeout_s}s."
+            ) from exc
         if r.returncode != 0:
             msg = r.stderr or r.stdout or "LibreOffice failed"
             raise InvoiceError(msg)
-        produced = tmp / (xlsx_path.stem + ".pdf")
+        produced = outdir / (xlsx_path.stem + ".pdf")
         if not produced.is_file():
             raise InvoiceError(f"Expected PDF not found: {produced}")
         shutil.copy2(produced, pdf_path)
     return True
 
 
-def export_xlsx_to_pdf_via_numbers(xlsx_path: Path, pdf_path: Path) -> None:
-    """Open xlsx in Numbers and export PDF (macOS only)."""
-    pdf_path.parent.mkdir(parents=True, exist_ok=True)
-    if pdf_path.is_file():
-        pdf_path.unlink()
-    src = str(xlsx_path.resolve())
-    dst = str(pdf_path.resolve())
-    src_esc = src.replace("\\", "\\\\").replace('"', '\\"')
-    dst_esc = dst.replace("\\", "\\\\").replace('"', '\\"')
-    script = f"""
-tell application "Numbers"
-    activate
-    open POSIX file "{src_esc}"
-    delay 3
-    export front document to POSIX file "{dst_esc}" as PDF
-    close front document saving no
-end tell
-"""
-    r = subprocess.run(
-        ["osascript", "-e", script],
-        capture_output=True,
-        text=True,
-    )
-    if r.returncode != 0 or not pdf_path.is_file():
-        msg = [
-            "Numbers could not export the PDF (LibreOffice is not installed).",
-            "Grant Terminal/Cursor automation access for Numbers in System Settings → Privacy & Security → Automation,",
-            "or install LibreOffice for headless PDF conversion.",
-        ]
-        if r.stderr:
-            msg.append(r.stderr.strip())
-        if r.stdout:
-            msg.append(r.stdout.strip())
-        raise RuntimeError("\n".join(m for m in msg if m))
-
-
 def convert_xlsx_to_pdf(xlsx_path: Path, pdf_path: Path) -> None:
     if _convert_xlsx_to_pdf_libreoffice(xlsx_path, pdf_path):
         return
-    if sys.platform == "darwin":
-        try:
-            export_xlsx_to_pdf_via_numbers(xlsx_path, pdf_path)
-            return
-        except RuntimeError as exc:
-            sys.stderr.write(f"{exc}\n")
-    hint = (
-        "On Debian/Ubuntu: sudo apt update && sudo apt install -y libreoffice-calc-nogui"
-        if sys.platform.startswith("linux")
-        else "Install LibreOffice from https://www.libreoffice.org/download/download/"
-    )
-    raise InvoiceError(
-        "Could not create PDF. Install LibreOffice (soffice in PATH) for headless conversion. "
-        f"{hint}. On macOS you can use Numbers automation instead."
-    )
-
-
-def resolve_numbers_file(asset_dir: Path | None = None) -> Path | None:
-    root = asset_dir or INVOICE_ASSET_DIR
-    for name in NUMBERS_NAMES:
-        p = root / name
-        if p.is_file():
-            return p
-    numbers = sorted(root.glob("*.numbers"))
-    if len(numbers) == 1:
-        return numbers[0]
-    if len(numbers) > 1:
-        raise InvoiceError(
-            "Multiple .numbers files found; keep one or rename to Template.numbers. "
-            f"Found: {[f.name for f in numbers]}"
+    if sys.platform.startswith("linux"):
+        hint = "On Debian/Ubuntu: sudo apt update && sudo apt install -y libreoffice-calc-nogui"
+    elif sys.platform == "darwin":
+        hint = (
+            "Install: brew install --cask libreoffice "
+            "or download from https://www.libreoffice.org/download/download/. "
+            "If soffice is already installed elsewhere, set INVOICE_SOFFICE to its full path."
         )
-    return None
+    else:
+        hint = "Install LibreOffice from https://www.libreoffice.org/download/download/"
+    raise InvoiceError(
+        "Could not create PDF. LibreOffice (soffice) is required for headless conversion. "
+        f"{hint}"
+    )
 
 
 def resolve_xlsx_template(asset_dir: Path | None = None) -> Path | None:
@@ -170,14 +162,6 @@ def resolve_xlsx_template(asset_dir: Path | None = None) -> Path | None:
         if p.is_file():
             return p
     return None
-
-
-def _posix_path_for_as(path: Path) -> str:
-    return str(path.resolve()).replace("\\", "\\\\").replace('"', '\\"')
-
-
-def _as_cell_string(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def format_date_dmy(d: date | datetime) -> str:
@@ -191,7 +175,7 @@ def apply_table_center_alignment_openpyxl(ws) -> None:
     for row in range(TABLE_HEADER_ROW, SUM_ROW + 1):
         for col in ALIGN_COLS:
             ws[f"{col}{row}"].alignment = CELL_CENTER
-    ws["F3"].alignment = CELL_CENTER
+    ws["G3"].alignment = CELL_CENTER
 
 
 def monday_of_week_au(day: date) -> date:
@@ -231,98 +215,37 @@ def get_date(rows: list[tuple[datetime, int]]) -> str:
     return format_date_dmy(next_next_sunday)
 
 
-def fill_invoice_via_numbers(
-    numbers_path: Path,
-    rows_data: list[tuple[datetime, int]],
-    invoice_number: int,
-    output_pdf: Path,
-    output_xlsx: Path,
-) -> None:
-    """
-    Open the .numbers template in Numbers, set cells (preserves images), export
-    output.xlsx and ``output_pdf``. Does not use openpyxl on the template.
-    """
-    if sys.platform != "darwin":
-        raise RuntimeError("Numbers automation requires macOS.")
-
-    sheet_n = int(os.environ.get("NUMBERS_SHEET", "1"))
-    table_n = int(os.environ.get("NUMBERS_TABLE", "1"))
-    src_esc = _posix_path_for_as(numbers_path)
-    xlsx_esc = _posix_path_for_as(output_xlsx)
-    pdf_esc = _posix_path_for_as(output_pdf)
-    output_xlsx.parent.mkdir(parents=True, exist_ok=True)
-    if output_xlsx.is_file():
-        output_xlsx.unlink()
-    if output_pdf.is_file():
-        output_pdf.unlink()
-
-    body: list[str] = [
-        'tell application "Numbers"',
-        "    activate",
-        f'    open POSIX file "{src_esc}"',
-        "    delay 3",
-        "    tell front document",
-        f"        tell sheet {sheet_n}",
-        f"            tell table {table_n}",
-    ]
-    for r in range(DATA_FIRST_ROW, DATA_LAST_ROW + 1):
-        for col in ("B", "C", "E", "F"):
-            body.append(f'                set value of cell "{col}{r}" to ""')
-    for i, (dt, parcels) in enumerate(rows_data):
-        r = DATA_FIRST_ROW + i
-        dmy = _as_cell_string(format_date_dmy(dt))
-        body.append(f'                set value of cell "B{r}" to "{dmy}"')
-        wd = _as_cell_string(weekday_english(dt))
-        body.append(f'                set value of cell "C{r}" to "{wd}"')
-        body.append(f'                set value of cell "E{r}" to {parcels}')
-        body.append(f'                set value of cell "F{r}" to "=E{r}*$G$15"')
-    body.append('                set value of cell "E26" to "=SUM(E17:E25)"')
-    body.append('                set value of cell "F26" to "=SUM(F17:F25)"')
-    body.append(f'                set value of cell "F3" to {invoice_number}')
-    b29_text = _as_cell_string(f"DATE : {get_date(rows_data)}")
-    body.append(f'                set value of cell "{DATE_LABEL_CELL}" to "{b29_text}"')
-    body.append("                try")
-    body.append('                    set alignment of cell "F3" to center')
-    body.append(f"                    repeat with rowNum from {TABLE_HEADER_ROW} to {SUM_ROW}")
-    body.append('                        repeat with colLetter in {"B", "C", "E", "F"}')
-    body.append(
-        '                            set alignment of cell ((colLetter as text) & rowNum) to center'
-    )
-    body.append("                        end repeat")
-    body.append("                    end repeat")
-    body.append("                end try")
-    body.extend(
-        [
-            "            end tell",
-            "        end tell",
-            f'        export to POSIX file "{xlsx_esc}" as Microsoft Excel',
-            f'        export to POSIX file "{pdf_esc}" as PDF',
-            "    end tell",
-            "    close front document saving no",
-            "end tell",
-        ]
-    )
-    script = "\n".join(body)
-    r = subprocess.run(
-        ["osascript", "-e", script],
-        capture_output=True,
-        text=True,
-    )
-    if r.returncode != 0 or not output_pdf.is_file():
-        msg = [
-            "Numbers fill or export failed.",
-            "Check NUMBERS_SHEET / NUMBERS_TABLE if cells land in the wrong place.",
-            "Allow Terminal/Cursor to control Numbers (System Settings → Privacy → Automation).",
-        ]
-        if r.stderr:
-            msg.append(r.stderr.strip())
-        if r.stdout:
-            msg.append(r.stdout.strip())
-        raise RuntimeError("\n".join(m for m in msg if m))
-
-
 def weekday_english(dt: datetime) -> str:
     return calendar.day_name[dt.weekday()]
+
+
+def _maybe_add_branding_image(ws, asset_dir: Path) -> None:
+    """
+    openpyxl drops embedded pictures when saving; add a logo from a PNG next to the template.
+    Set INVOICE_LOGO_ANCHOR (default A1), optional INVOICE_LOGO_WIDTH_PX / INVOICE_LOGO_HEIGHT_PX.
+    """
+    logo = asset_dir / "invoice_branding.png"
+    if not logo.is_file():
+        return
+    try:
+        from openpyxl.drawing.image import Image as XLImage
+    except ImportError:
+        return
+    try:
+        img = XLImage(str(logo))
+        w = os.environ.get("INVOICE_LOGO_WIDTH_PX")
+        h = os.environ.get("INVOICE_LOGO_HEIGHT_PX")
+        if w:
+            img.width = int(w)
+        if h:
+            img.height = int(h)
+    except Exception:
+        return
+    anchor = os.environ.get("INVOICE_LOGO_ANCHOR", "A1")
+    try:
+        ws.add_image(img, anchor)
+    except Exception:
+        return
 
 
 def fill_workbook(
@@ -330,11 +253,14 @@ def fill_workbook(
     rows_data: list[tuple[datetime, int]],
     invoice_number: int,
     output_xlsx: Path,
+    *,
+    include_gst: bool = True,
+    asset_dir: Path | None = None,
 ) -> None:
     wb = load_workbook(wb_path)
     ws = wb.active
 
-    ws["F3"] = invoice_number
+    ws["G3"] = invoice_number
 
     for r in range(DATA_FIRST_ROW, DATA_LAST_ROW + 1):
         ws[f"B{r}"] = None
@@ -349,18 +275,24 @@ def fill_workbook(
         cell_b.number_format = "@"
         ws[f"C{r}"] = weekday_english(dt)
         ws[f"E{r}"] = parcels
-        ws[f"F{r}"] = f"=E{r}*$G$15"
+        ws[f"F{r}"] = f"=E{r}*$G$12"
 
-    ws["E26"] = "=SUM(E17:E25)"
-    ws["F26"] = "=SUM(F17:F25)"
+    first_r = DATA_FIRST_ROW
+    last_r = DATA_LAST_ROW
+    ws[f"E{SUM_ROW}"] = f"=SUM(E{first_r}:E{last_r})"
+    ws[f"F{SUM_ROW}"] = f"=SUM(F{first_r}:F{last_r})"
+    ws[f"B{SUM_ROW}"] = "TOTAL PAYABLE AMOUNT (GST)" if include_gst else "TOTAL PAYABLE AMOUNT "
 
     apply_table_center_alignment_openpyxl(ws)
 
-    c29 = ws[DATE_LABEL_CELL]
-    c29.value = f"DATE : {get_date(rows_data)}"
-    c29.font = Font(bold=True)
-    c29.alignment = CELL_LEFT
-    c29.number_format = "@"
+    c_pay = ws[DATE_VALUE_CELL]
+    c_pay.value = f"Date : {get_date(rows_data)}"
+    c_pay.font = Font(name="Arial", bold=True)
+    c_pay.alignment = CELL_LEFT
+    c_pay.number_format = "@"
+
+    ad = asset_dir or INVOICE_ASSET_DIR
+    _maybe_add_branding_image(ws, ad)
 
     wb.save(output_xlsx)
 
@@ -369,6 +301,7 @@ def run_invoice_pipeline(
     rows: list[tuple[datetime, int]],
     *,
     output_dir: Path,
+    include_gst: bool = True,
     asset_dir: Path | None = None,
 ) -> tuple[Path, Path, int]:
     """
@@ -391,24 +324,20 @@ def run_invoice_pipeline(
     out_pdf = output_pdf_path_for_week(week_monday, output_dir)
     out_xlsx = output_dir / "output.xlsx"
 
-    numbers = resolve_numbers_file(ad)
     xlsx_tpl = resolve_xlsx_template(ad)
-
-    if sys.platform == "darwin" and numbers is not None:
-        fill_invoice_via_numbers(numbers, rows, invoice_number, out_pdf, out_xlsx)
-        return out_xlsx, out_pdf, invoice_number
-
-    if xlsx_tpl is not None:
-        fill_workbook(xlsx_tpl, rows, invoice_number, out_xlsx)
-        convert_xlsx_to_pdf(out_xlsx, out_pdf)
-        return out_xlsx, out_pdf, invoice_number
-
-    if numbers is not None:
+    if xlsx_tpl is None:
         raise InvoiceError(
-            "Found a .numbers template but Numbers automation only works on macOS. "
-            f"Export to {XLSX_NAMES[0]} or run on a Mac."
+            f"No invoice template in {ad}. Add {XLSX_NAMES[0]} "
+            "(openpyxl fills cells; export from Numbers/Excel if you design there)."
         )
 
-    raise InvoiceError(
-        f"No invoice template in {ad}. Add a .numbers file or {XLSX_NAMES[0]}."
+    fill_workbook(
+        xlsx_tpl,
+        rows,
+        invoice_number,
+        out_xlsx,
+        include_gst=include_gst,
+        asset_dir=ad,
     )
+    convert_xlsx_to_pdf(out_xlsx, out_pdf)
+    return out_xlsx, out_pdf, invoice_number

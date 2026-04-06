@@ -75,7 +75,8 @@ if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
     DATABASES["default"]["CONN_MAX_AGE"] = 0
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+# Used for “today” on date pickers (e.g. Australia/Sydney). Default UTC.
+TIME_ZONE = os.environ.get("DJANGO_TIME_ZONE", "UTC")
 USE_I18N = True
 USE_TZ = True
 

@@ -21,7 +21,7 @@
             {{ reference_date_display }} — pre-selected below for the next line.
           </p>
         {% endif %}
-        <p class="mt-2 text-sm text-slate-500">Delivery date is limited to these seven days. After you add a line, the next day in the week is selected automatically.</p>
+        <p class="mt-2 text-sm text-slate-500">Delivery dates are only <strong class="font-medium text-slate-700">today or earlier</strong> (no future days). Dates are limited to this Monday–Sunday week. After you add a line, the next day in the week is selected when it is still not in the future.</p>
       </div>
     </div>
   </div>
@@ -117,6 +117,18 @@
     {% csrf_token %}
     <input type="hidden" name="action" value="finish">
     <div>
+      <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+        <input
+          type="checkbox"
+          name="include_gst"
+          {% if gst_included %}checked{% endif %}
+          class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+        >
+        GST included
+      </label>
+      <p class="mt-1.5 text-sm text-slate-500">Checked by default. This controls the text in cell B21.</p>
+    </div>
+    <div>
       <label for="delivery_email" class="block text-sm font-medium text-slate-700">Email for delivery <span class="font-normal text-slate-500">(optional)</span></label>
       <input
         type="email"
@@ -142,4 +154,22 @@
   </p>
 </div>
 {% endif %}
+<script>
+(function () {
+  function bindParcelsDigitsOnly(el) {
+    el.addEventListener("beforeinput", function (e) {
+      if (e.data != null && e.data.length && !/^\d+$/.test(e.data)) e.preventDefault();
+    });
+    el.addEventListener("input", function () {
+      this.value = this.value.replace(/\D/g, "");
+    });
+    el.addEventListener("paste", function (e) {
+      e.preventDefault();
+      var t = (e.clipboardData || window.clipboardData).getData("text") || "";
+      this.value = t.replace(/\D/g, "");
+    });
+  }
+  document.querySelectorAll('input[name="parcels"]').forEach(bindParcelsDigitsOnly);
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,23 @@
+Invoice template (Python / openpyxl)
+------------------------------------
+• The app loads Template.xlsx, writes cells with openpyxl, saves output.xlsx, then converts
+  to PDF with LibreOffice (headless). Each run uses a temporary LibreOffice profile so the
+  converter can exit cleanly and not stay open in the dock.
+
+• openpyxl does NOT keep embedded pictures from the original .xlsx when saving (library
+  limitation). Use invoice_branding.png for a logo:
+
+  Optional env: INVOICE_LOGO_ANCHOR (default A1), INVOICE_LOGO_WIDTH_PX, INVOICE_LOGO_HEIGHT_PX
+
+• Design in Numbers or Excel if you like, then export to Template.xlsx for runtime.
+
+Cell map (current default Template.xlsx): table header row 13; data B14–F20; totals E21/F21;
+invoice # G3; hourly rate G12; payment due date in B24.
+Cell B21 is set by GST option:
+• GST on  -> "TOTAL PAYABLE AMOUNT (GST)"
+• GST off -> "TOTAL PAYABLE AMOUNT "
+If your sheet layout changes, edit DATA_FIRST_ROW, DATA_LAST_ROW, SUM_ROW, DATE_VALUE_CELL,
+TABLE_HEADER_ROW in invoicer/pipeline.py.
+
+
+

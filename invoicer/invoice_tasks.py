@@ -65,11 +65,15 @@ def process_invoice_job(public_id: UUID) -> None:
         d = date.fromisoformat(r["d"])
         tuples.append((datetime.combine(d, datetime.min.time()), int(r["p"])))
     tuples.sort(key=lambda x: x[0])
+    include_gst = True
+    if job.rows_json:
+        include_gst = bool(job.rows_json[0].get("gst", True))
 
     try:
         xlsx_path, pdf_path, inv_no = run_invoice_pipeline(
             tuples,
             output_dir=output_dir,
+            include_gst=include_gst,
             asset_dir=Path(settings.INVOICE_ASSET_DIR),
         )
     except InvoiceError as exc:
