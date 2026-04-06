@@ -1,0 +1,17 @@
+{% extends "invoicer/base.html" %}
+{% block title %}Invoice failed{% endblock %}
+{% block content %}
+<div class="surface-card">
+  <div class="mb-6 flex items-start gap-3">
+    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-700">
+      <i data-lucide="circle-alert" class="h-7 w-7" aria-hidden="true"></i>
+    </span>
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Could not build invoice</h1>
+      <p class="mt-2 text-sm text-slate-600">{{ job.error_message|default:"Something went wrong." }}</p>
+    </div>
+  </div>
+  <a href="{% url 'invoicer:entries' %}" class="btn btn-primary w-full sm:w-auto">Back to lines</a>
+  <a href="{% url 'invoicer:week_select' %}?reset=1" class="btn btn-secondary mt-3 w-full sm:w-auto sm:ml-3">Start over</a>
+</div>
+{% endblock %}

@@ -14,17 +14,30 @@
     </div>
   </div>
 
+  {% if job.email %}
+    <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+      {% if job.email_sent %}
+        <p><span class="font-medium text-slate-900">Email sent</span> to {{ job.email }} with PDF and Excel attached.</p>
+      {% elif job.email_error %}
+        <p class="text-amber-900"><span class="font-medium">Email could not be sent:</span> {{ job.email_error }}</p>
+        <p class="mt-1 text-slate-600">You can still download the files below.</p>
+      {% else %}
+        <p>We will send a copy to <span class="font-medium">{{ job.email }}</span> when sending completes.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
   <p class="mb-3 text-sm font-medium text-slate-700">Downloads</p>
   <ul class="space-y-3">
     <li>
-      <a href="{% url 'invoicer:download' 'pdf' %}" class="group flex min-h-[2.75rem] touch-manipulation items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 sm:min-h-0">
+      <a href="{% url 'invoicer:download_job' job.public_id 'pdf' %}" class="group flex min-h-[2.75rem] touch-manipulation items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 sm:min-h-0">
         <i data-lucide="file-down" class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true"></i>
         <span class="min-w-0 truncate">{{ pdf_name }}</span>
         <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
       </a>
     </li>
     <li>
-      <a href="{% url 'invoicer:download' 'xlsx' %}" class="group flex min-h-[2.75rem] touch-manipulation items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-sky-700 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 sm:min-h-0">
+      <a href="{% url 'invoicer:download_job' job.public_id 'xlsx' %}" class="group flex min-h-[2.75rem] touch-manipulation items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-sky-700 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 sm:min-h-0">
         <i data-lucide="file-spreadsheet" class="h-5 w-5 shrink-0 text-sky-600" aria-hidden="true"></i>
         <span class="min-w-0 truncate">{{ xlsx_name }}</span>
         <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>

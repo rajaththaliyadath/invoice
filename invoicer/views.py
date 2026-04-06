@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import calendar
+import os
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 from django.conf import settings
 from django.contrib import messages
-from django.http import FileResponse, Http404
-from django.shortcuts import redirect, render
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.http import FileResponse, Http404, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
-from .pipeline import InvoiceError, monday_of_week_au, run_invoice_pipeline
+from .invoice_tasks import process_invoice_job
+from .models import InvoiceJob
+from .pipeline import monday_of_week_au
+from .worker_spawn import spawn_invoice_job_process
 
 from .forms import DeliveryLineForm, WeekAnchorForm
 
@@ -18,9 +25,7 @@ SESSION_WEEK = "invoice_week_monday"
 SESSION_ROWS = "invoice_rows"
 SESSION_REF_DATE = "invoice_reference_date"
 SESSION_FORM_DEFAULT_DATE = "invoice_form_default_date"
-SESSION_LAST_PDF = "invoice_last_pdf"
-SESSION_LAST_XLSX = "invoice_last_xlsx"
-SESSION_INV_NO = "invoice_last_number"
+SESSION_ACTIVE_JOB = "invoice_active_job"
 
 
 def _week_day_isos(monday: date) -> list[str]:
@@ -49,6 +54,13 @@ def _ensure_session_key(request):
         request.session.save()
 
 
+def _job_for_session(request, public_id: UUID) -> InvoiceJob:
+    job = get_object_or_404(InvoiceJob, public_id=public_id)
+    if job.session_key != request.session.session_key:
+        raise Http404
+    return job
+
+
 @require_http_methods(["GET", "POST"])
 def week_select(request):
     if request.GET.get("reset"):
@@ -64,8 +76,7 @@ def week_select(request):
             request.session[SESSION_REF_DATE] = d.isoformat()
             request.session[SESSION_ROWS] = []
             request.session.pop(SESSION_FORM_DEFAULT_DATE, None)
-            for k in (SESSION_LAST_PDF, SESSION_LAST_XLSX, SESSION_INV_NO):
-                request.session.pop(k, None)
+            request.session.pop(SESSION_ACTIVE_JOB, None)
             messages.success(
                 request,
                 f"Week set: Monday {mon.strftime('%d/%m/%Y')} – Sunday "
@@ -162,27 +173,41 @@ def entries(request):
             if not rows:
                 messages.error(request, "Add at least one delivery line before finishing.")
                 return redirect("invoicer:entries")
+            email = (request.POST.get("delivery_email") or "").strip()
+            if email:
+                try:
+                    validate_email(email)
+                except ValidationError:
+                    messages.error(request, "Please enter a valid email address, or leave it blank.")
+                    return redirect("invoicer:entries")
+
             _ensure_session_key(request)
             sid = request.session.session_key
-            output_dir = Path(settings.INVOICE_OUTPUT_ROOT) / sid
-            tuples: list[tuple[datetime, int]] = []
-            for r in rows:
-                d = date.fromisoformat(r["d"])
-                tuples.append((datetime.combine(d, datetime.min.time()), int(r["p"])))
-            tuples.sort(key=lambda x: x[0])
-            try:
-                _xlsx, pdf_path, inv_no = run_invoice_pipeline(
-                    tuples,
-                    output_dir=output_dir,
-                    asset_dir=Path(settings.INVOICE_ASSET_DIR),
+            job = InvoiceJob.objects.create(
+                session_key=sid,
+                email=email,
+                rows_json=list(rows),
+            )
+            request.session[SESSION_ACTIVE_JOB] = str(job.public_id)
+
+            if os.environ.get("INVOICE_JOB_INLINE", "").lower() in ("1", "true", "yes"):
+                process_invoice_job(job.public_id)
+            else:
+                spawn_invoice_job_process(job.public_id)
+
+            if email:
+                messages.success(
+                    request,
+                    "Your invoice is building in the background. "
+                    "We will email the PDF and Excel when it is ready.",
                 )
-            except InvoiceError as exc:
-                messages.error(request, str(exc))
-                return redirect("invoicer:entries")
-            request.session[SESSION_LAST_PDF] = pdf_path.name
-            request.session[SESSION_LAST_XLSX] = _xlsx.name
-            request.session[SESSION_INV_NO] = inv_no
-            return redirect("invoicer:done")
+            else:
+                messages.success(
+                    request,
+                    "Your invoice is building in the background. "
+                    "This page will update when it is ready to download.",
+                )
+            return redirect("invoicer:job_progress", public_id=job.public_id)
 
     if bound_form is not None:
         form = bound_form
@@ -220,38 +245,87 @@ def entries(request):
     )
 
 
+@require_http_methods(["GET"])
+def job_progress(request, public_id: UUID):
+    job = _job_for_session(request, public_id)
+    if job.status == InvoiceJob.Status.DONE:
+        return redirect("invoicer:done")
+    if job.status == InvoiceJob.Status.FAILED:
+        return render(
+            request,
+            "invoicer/job_failed.html",
+            {"job": job},
+        )
+    return render(
+        request,
+        "invoicer/job_progress.html",
+        {"job": job},
+    )
+
+
+@require_http_methods(["GET"])
+def job_status(request, public_id: UUID):
+    job = _job_for_session(request, public_id)
+    return JsonResponse(
+        {
+            "status": job.status,
+            "error": job.error_message,
+            "invoice_no": job.invoice_number,
+            "pdf_name": job.pdf_name,
+            "xlsx_name": job.xlsx_name,
+            "email": job.email,
+            "email_sent": job.email_sent,
+            "email_error": job.email_error,
+        }
+    )
+
+
+@require_http_methods(["GET"])
 def done(request):
-    if not request.session.get(SESSION_LAST_PDF):
+    jid = request.session.get(SESSION_ACTIVE_JOB)
+    if not jid:
         messages.warning(request, "No invoice ready yet.")
         return redirect("invoicer:week_select")
+    try:
+        uid = UUID(jid)
+    except ValueError:
+        raise Http404
+    job = _job_for_session(request, uid)
+    if job.status in (InvoiceJob.Status.PENDING, InvoiceJob.Status.RUNNING):
+        return redirect("invoicer:job_progress", public_id=job.public_id)
+    if job.status == InvoiceJob.Status.FAILED:
+        return render(request, "invoicer/job_failed.html", {"job": job})
     return render(
         request,
         "invoicer/done.html",
         {
-            "pdf_name": request.session[SESSION_LAST_PDF],
-            "xlsx_name": request.session[SESSION_LAST_XLSX],
-            "invoice_no": request.session.get(SESSION_INV_NO),
+            "job": job,
+            "pdf_name": job.pdf_name,
+            "xlsx_name": job.xlsx_name,
+            "invoice_no": job.invoice_number,
         },
     )
 
 
-def download(request, kind: str):
+def download_job(request, public_id: UUID, kind: str):
     if kind not in ("pdf", "xlsx"):
         raise Http404
-    key = request.session.session_key
-    name_key = SESSION_LAST_PDF if kind == "pdf" else SESSION_LAST_XLSX
-    filename = request.session.get(name_key)
-    if not key or not filename:
+    job = _job_for_session(request, public_id)
+    if job.status != InvoiceJob.Status.DONE:
         raise Http404
-    safe = {request.session.get(SESSION_LAST_PDF), request.session.get(SESSION_LAST_XLSX)}
-    if filename not in safe:
+    filename = job.pdf_name if kind == "pdf" else job.xlsx_name
+    if not filename:
         raise Http404
-    path = Path(settings.INVOICE_OUTPUT_ROOT) / key / filename
+    path = Path(settings.INVOICE_OUTPUT_ROOT) / job.session_key / filename
     if not path.is_file():
         raise Http404
     return FileResponse(
         path.open("rb"),
         as_attachment=True,
         filename=filename,
-        content_type="application/pdf" if kind == "pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content_type=(
+            "application/pdf"
+            if kind == "pdf"
+            else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
     )

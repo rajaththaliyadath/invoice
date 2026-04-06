@@ -5,6 +5,7 @@ __pycache__/
 .DS_Store
 db.sqlite3
 data/db.sqlite3
+data/invoice_worker.log
 # LibreOffice / dconf profile when HOME points at the app dir (production)
 .cache/
 .config/

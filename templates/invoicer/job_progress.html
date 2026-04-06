@@ -1,0 +1,53 @@
+{% extends "invoicer/base.html" %}
+{% block title %}Building invoice{% endblock %}
+{% block content %}
+<div class="surface-card">
+  <div class="mb-6 flex items-start gap-3">
+    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700" aria-hidden="true">
+      <svg class="h-7 w-7 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </span>
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Building your invoice</h1>
+      <p class="mt-2 text-sm text-slate-600">
+        This runs in the background (PDF + Excel). This page will move forward when it is ready.
+        {% if job.email %}
+          <span class="mt-1 block font-medium text-slate-800">We will also email {{ job.email }} with the attachments.</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+  <p id="job-status-hint" class="text-sm text-slate-500">Checking status…</p>
+</div>
+<script>
+(function () {
+  var statusUrl = "{% url 'invoicer:job_status' job.public_id %}";
+  var doneUrl = "{% url 'invoicer:done' %}";
+  var failedBase = "{% url 'invoicer:job_progress' job.public_id %}";
+  function poll() {
+    fetch(statusUrl, { credentials: "same-origin", headers: { "Accept": "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var hint = document.getElementById("job-status-hint");
+        if (data.status === "done") {
+          if (hint) hint.textContent = "Ready.";
+          window.location.href = doneUrl;
+          return;
+        }
+        if (data.status === "failed") {
+          window.location.href = failedBase;
+          return;
+        }
+        if (hint) hint.textContent = "Still working…";
+        setTimeout(poll, 2000);
+      })
+      .catch(function () {
+        setTimeout(poll, 4000);
+      });
+  }
+  setTimeout(poll, 800);
+})();
+</script>
+{% endblock %}

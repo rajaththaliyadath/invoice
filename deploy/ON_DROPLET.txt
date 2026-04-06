@@ -38,8 +38,11 @@ Paths below use /var/www/invoice — change if you use another directory.
 8) TLS:
    sudo certbot --nginx -d invoices.rajatht.me
 
-Updates after git push:
+Updates after git pull:
    cd /var/www/invoice && git pull && .venv/bin/pip install -r requirements.txt \
-   && .venv/bin/python manage.py migrate --noinput \
+   && sudo -u www-data bash -c 'cd /var/www/invoice && export $(grep -v "^#" .env | xargs) && .venv/bin/python manage.py migrate --noinput' \
    && .venv/bin/python manage.py collectstatic --noinput \
+   && sudo chown -R www-data:www-data /var/www/invoice/data \
    && sudo systemctl restart gunicorn-invoices
+
+Email: set SMTP in .env (see deploy/env.example). Until then, “console” backend only logs mail (no real delivery).
