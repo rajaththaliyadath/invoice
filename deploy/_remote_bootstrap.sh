@@ -28,9 +28,12 @@ fi
 chown www-data:www-data .env
 chmod 640 .env
 
-.venv/bin/python manage.py migrate --noinput
+mkdir -p "$INV/data" "$INV/media/invoices"
+chown www-data:www-data "$INV/data"
+# Migrations as www-data so SQLite + WAL files in data/ are owned correctly (avoids "readonly database").
+sudo -u www-data bash -c "cd \"$INV\" && export \$(grep -v '^#' .env | xargs) && .venv/bin/python manage.py migrate --noinput"
+
 .venv/bin/python manage.py collectstatic --noinput
-mkdir -p media/invoices
 
 install -m 644 deploy/gunicorn-invoices.service /etc/systemd/system/gunicorn-invoices.service
 systemctl daemon-reload
@@ -78,8 +81,7 @@ certbot --nginx -d invoices.rajatht.me --non-interactive --agree-tos --redirect 
 
 systemctl reload nginx 2>/dev/null || true
 
-chown www-data:www-data "$INV/db.sqlite3" 2>/dev/null || true
-chown -R www-data:www-data "$INV/media" "$INV/staticfiles"
+chown -R www-data:www-data "$INV/data" "$INV/media" "$INV/staticfiles" 2>/dev/null || true
 
 systemctl is-active gunicorn-invoices
 curl -sI -m 10 http://127.0.0.1:8001/ | head -5 || true

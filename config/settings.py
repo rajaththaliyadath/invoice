@@ -57,9 +57,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# SQLite lives under data/ so the DB dir is writable by the app user (Gunicorn) without chmod 777 on the project root.
+_SQLITE_DIR = BASE_DIR / "data"
+_DEFAULT_SQLITE = _SQLITE_DIR / "db.sqlite3"
+if not os.environ.get("DATABASE_URL"):
+    _SQLITE_DIR.mkdir(exist_ok=True)
+
 DATABASES = {
     "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        default=f"sqlite:///{_DEFAULT_SQLITE}",
         conn_max_age=600,
         ssl_require=os.environ.get("DATABASE_SSL_REQUIRE", "").lower() in ("1", "true", "yes"),
     )
