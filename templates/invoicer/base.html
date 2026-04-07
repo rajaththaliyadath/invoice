@@ -44,7 +44,7 @@
               {% endif %}
               <span class="hidden sm:inline text-xs">{{ request.user.username }}</span>
             </button>
-            <div id="profile-menu" class="fixed hidden w-56 origin-top rounded-xl border border-slate-200 bg-white p-2 shadow-lg" style="right: 0.75rem; top: 4.25rem; z-index: 9999;">
+            <div id="profile-menu" class="fixed hidden w-56 origin-top rounded-xl border border-slate-200 bg-white p-2 shadow-lg" style="right: 0; top: 0; z-index: 9999;">
               <a href="{% url 'invoicer:account_settings' %}" class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Settings</a>
               <a href="{% url 'invoicer:advanced_settings' %}" class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Advanced</a>
               <a href="{% url 'invoicer:invoice_history' %}" class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">History</a>
@@ -89,11 +89,23 @@
       var btn = document.getElementById("profile-menu-button");
       var menu = document.getElementById("profile-menu");
       if (!btn || !menu) return;
+      function positionMenu() {
+        var rect = btn.getBoundingClientRect();
+        var rightGap = Math.max(8, window.innerWidth - rect.right);
+        menu.style.right = rightGap + "px";
+        menu.style.top = Math.round(rect.bottom + 6) + "px";
+        var menuRect = menu.getBoundingClientRect();
+        if (menuRect.bottom > window.innerHeight - 8) {
+          var adjustedTop = Math.max(8, window.innerHeight - menuRect.height - 8);
+          menu.style.top = adjustedTop + "px";
+        }
+      }
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
         var isOpen = !menu.classList.contains("hidden");
         menu.classList.toggle("hidden");
         btn.setAttribute("aria-expanded", isOpen ? "false" : "true");
+        if (!isOpen) positionMenu();
       });
       document.addEventListener("click", function (e) {
         if (!menu.classList.contains("hidden") && !menu.contains(e.target) && e.target !== btn) {
@@ -101,6 +113,12 @@
           btn.setAttribute("aria-expanded", "false");
         }
       });
+      window.addEventListener("resize", function () {
+        if (!menu.classList.contains("hidden")) positionMenu();
+      });
+      window.addEventListener("scroll", function () {
+        if (!menu.classList.contains("hidden")) positionMenu();
+      }, { passive: true });
     });
   </script>
 </body>
