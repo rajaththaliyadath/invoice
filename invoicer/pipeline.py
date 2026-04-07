@@ -178,6 +178,12 @@ def apply_table_center_alignment_openpyxl(ws) -> None:
     ws["G3"].alignment = CELL_CENTER
 
 
+def _mapping_or_default(mapping: dict | None, key: str, default):
+    if not mapping:
+        return default
+    return mapping.get(key, default)
+
+
 def monday_of_week_au(day: date) -> date:
     """Return the Monday starting the Australian (ISO) week that contains ``day``."""
     return day - timedelta(days=day.weekday())
@@ -255,37 +261,76 @@ def fill_workbook(
     output_xlsx: Path,
     *,
     include_gst: bool = True,
+    employer_name: str = "",
+    employer_abn: str = "",
+    contractor_name: str = "",
+    contractor_abn: str = "",
+    rate_per_parcel: float = 0,
+    bank_name: str = "",
+    bsb_number: str = "",
+    account_number: str = "",
+    account_name: str = "",
+    mapping: dict | None = None,
     asset_dir: Path | None = None,
 ) -> None:
     wb = load_workbook(wb_path)
     ws = wb.active
 
-    ws["G3"] = invoice_number
+    data_first_row = int(_mapping_or_default(mapping, "data_first_row", DATA_FIRST_ROW))
+    data_last_row = int(_mapping_or_default(mapping, "data_last_row", DATA_LAST_ROW))
+    sum_row = int(_mapping_or_default(mapping, "sum_row", SUM_ROW))
+    table_header_row = int(_mapping_or_default(mapping, "table_header_row", TABLE_HEADER_ROW))
+    invoice_cell = _mapping_or_default(mapping, "invoice_number_cell", "G3")
+    rate_cell = _mapping_or_default(mapping, "rate_cell", "G12")
+    employer_name_cell = _mapping_or_default(mapping, "employer_name_cell", "C8")
+    employer_abn_cell = _mapping_or_default(mapping, "employer_abn_cell", "C9")
+    contractor_name_cell = _mapping_or_default(mapping, "contractor_name_cell", "G8")
+    contractor_abn_cell = _mapping_or_default(mapping, "contractor_abn_cell", "G9")
+    contractor_name_line_cell = _mapping_or_default(mapping, "contractor_name_line_cell", "B25")
+    bank_name_cell = _mapping_or_default(mapping, "bank_name_cell", "C28")
+    bsb_cell = _mapping_or_default(mapping, "bsb_cell", "C29")
+    account_number_cell = _mapping_or_default(mapping, "account_number_cell", "C30")
+    account_name_cell = _mapping_or_default(mapping, "account_name_cell", "C31")
+    total_label_cell = _mapping_or_default(mapping, "total_label_cell", "B21")
+    date_cell = _mapping_or_default(mapping, "date_cell", DATE_VALUE_CELL)
 
-    for r in range(DATA_FIRST_ROW, DATA_LAST_ROW + 1):
+    ws[invoice_cell] = invoice_number
+    ws[employer_name_cell] = employer_name
+    ws[employer_abn_cell] = employer_abn
+    ws[contractor_name_cell] = contractor_name
+    ws[contractor_abn_cell] = contractor_abn
+    ws[rate_cell] = rate_per_parcel
+    ws[contractor_name_line_cell] = f"Name : {contractor_name}"
+    ws[bank_name_cell] = bank_name
+    ws[bsb_cell] = bsb_number
+    ws[account_number_cell] = account_number
+    ws[account_name_cell] = account_name
+
+    for r in range(data_first_row, data_last_row + 1):
         ws[f"B{r}"] = None
         ws[f"C{r}"] = None
         ws[f"E{r}"] = None
         ws[f"F{r}"] = None
 
     for i, (dt, parcels) in enumerate(rows_data):
-        r = DATA_FIRST_ROW + i
+        r = data_first_row + i
         cell_b = ws[f"B{r}"]
         cell_b.value = format_date_dmy(dt)
         cell_b.number_format = "@"
         ws[f"C{r}"] = weekday_english(dt)
         ws[f"E{r}"] = parcels
-        ws[f"F{r}"] = f"=E{r}*$G$12"
+        ws[f"F{r}"] = f"=E{r}*${rate_cell}"
 
-    first_r = DATA_FIRST_ROW
-    last_r = DATA_LAST_ROW
-    ws[f"E{SUM_ROW}"] = f"=SUM(E{first_r}:E{last_r})"
-    ws[f"F{SUM_ROW}"] = f"=SUM(F{first_r}:F{last_r})"
-    ws[f"B{SUM_ROW}"] = "TOTAL PAYABLE AMOUNT (GST)" if include_gst else "TOTAL PAYABLE AMOUNT "
+    ws[f"E{sum_row}"] = f"=SUM(E{data_first_row}:E{data_last_row})"
+    ws[f"F{sum_row}"] = f"=SUM(F{data_first_row}:F{data_last_row})"
+    ws[total_label_cell] = "TOTAL PAYABLE AMOUNT (GST)" if include_gst else "TOTAL PAYABLE AMOUNT "
 
-    apply_table_center_alignment_openpyxl(ws)
+    for row in range(table_header_row, sum_row + 1):
+        for col in ALIGN_COLS:
+            ws[f"{col}{row}"].alignment = CELL_CENTER
+    ws[invoice_cell].alignment = CELL_CENTER
 
-    c_pay = ws[DATE_VALUE_CELL]
+    c_pay = ws[date_cell]
     c_pay.value = f"Date : {get_date(rows_data)}"
     c_pay.font = Font(name="Arial", bold=True)
     c_pay.alignment = CELL_LEFT
@@ -302,6 +347,16 @@ def run_invoice_pipeline(
     *,
     output_dir: Path,
     include_gst: bool = True,
+    employer_name: str = "",
+    employer_abn: str = "",
+    contractor_name: str = "",
+    contractor_abn: str = "",
+    rate_per_parcel: float = 0,
+    bank_name: str = "",
+    bsb_number: str = "",
+    account_number: str = "",
+    account_name: str = "",
+    mapping: dict | None = None,
     asset_dir: Path | None = None,
 ) -> tuple[Path, Path, int]:
     """
@@ -310,7 +365,9 @@ def run_invoice_pipeline(
     """
     if not rows:
         raise InvoiceError("Add at least one delivery line.")
-    max_lines = DATA_LAST_ROW - DATA_FIRST_ROW + 1
+    data_first_row = int(_mapping_or_default(mapping, "data_first_row", DATA_FIRST_ROW))
+    data_last_row = int(_mapping_or_default(mapping, "data_last_row", DATA_LAST_ROW))
+    max_lines = data_last_row - data_first_row + 1
     if len(rows) > max_lines:
         raise InvoiceError(f"Too many rows (max {max_lines}).")
 
@@ -337,6 +394,16 @@ def run_invoice_pipeline(
         invoice_number,
         out_xlsx,
         include_gst=include_gst,
+        employer_name=employer_name,
+        employer_abn=employer_abn,
+        contractor_name=contractor_name,
+        contractor_abn=contractor_abn,
+        rate_per_parcel=rate_per_parcel,
+        bank_name=bank_name,
+        bsb_number=bsb_number,
+        account_number=account_number,
+        account_name=account_name,
+        mapping=mapping,
         asset_dir=ad,
     )
     convert_xlsx_to_pdf(out_xlsx, out_pdf)

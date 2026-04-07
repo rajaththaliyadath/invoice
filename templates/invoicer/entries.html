@@ -113,6 +113,18 @@
       </tbody>
     </table>
   </div>
+  <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <h3 class="text-sm font-semibold text-slate-900">Preview totals</h3>
+    <p class="mt-1 text-sm text-slate-700">
+      Parcels: <span class="font-semibold tabular-nums">{{ total_parcels }}</span>
+      {% if rate_per_parcel is not None %}
+        · Rate: <span class="font-semibold tabular-nums">{{ rate_per_parcel|floatformat:2 }}</span>
+        · Estimated amount: <span class="font-semibold tabular-nums">{{ preview_amount|floatformat:2 }}</span>
+      {% else %}
+        · Rate not found in template cell G12.
+      {% endif %}
+    </p>
+  </div>
   <form method="post" action="" class="mt-6 space-y-5 border-t border-slate-100 pt-6">
     {% csrf_token %}
     <input type="hidden" name="action" value="finish">

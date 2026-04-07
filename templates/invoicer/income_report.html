@@ -1,0 +1,16 @@
+{% extends "invoicer/base.html" %}
+{% block title %}Income report{% endblock %}
+{% block content %}
+<div class="surface-card max-w-2xl">
+  <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Income report</h1>
+  <form method="get" class="mt-5 grid gap-3 sm:grid-cols-3">
+    <input type="date" name="start" value="{{ start }}" class="mt-1 block w-full min-h-[2.75rem] rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm">
+    <input type="date" name="end" value="{{ end }}" class="mt-1 block w-full min-h-[2.75rem] rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm">
+    <button type="submit" class="btn btn-primary">Calculate</button>
+  </form>
+  <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <p class="text-sm text-slate-700">Invoices: <span class="font-semibold">{{ count }}</span></p>
+    <p class="mt-1 text-sm text-slate-700">Total income: <span class="font-semibold tabular-nums">{{ total }}</span></p>
+  </div>
+</div>
+{% endblock %}

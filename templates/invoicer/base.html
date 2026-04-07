@@ -13,19 +13,51 @@
 </head>
 <body class="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900">
   <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 py-3 backdrop-blur-md sm:py-4">
-    <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-3 sm:px-4">
-      <a href="{% url 'invoicer:week_select' %}" class="flex min-w-0 touch-manipulation items-center gap-2 text-slate-800">
+    <div class="mx-auto flex h-12 max-w-3xl items-center justify-between gap-3 px-3 sm:px-4">
+      <a href="{% if request.user.is_authenticated %}{% url 'invoicer:week_select' %}{% else %}{% url 'invoicer:login' %}{% endif %}" class="flex min-w-0 touch-manipulation items-center gap-2 text-slate-800">
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
           <i data-lucide="wallet" class="h-5 w-5" aria-hidden="true"></i>
         </span>
         <span class="truncate text-base font-semibold sm:text-lg">Invoice</span>
       </a>
-      <nav class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm font-medium text-slate-600">
-        <a href="{% url 'invoicer:week_select' %}" class="touch-manipulation rounded-lg px-1 py-1 text-emerald-700 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Week</a>
-        {% if request.session.invoice_week_monday %}
-          <a href="{% url 'invoicer:entries' %}" class="touch-manipulation rounded-lg px-1 py-1 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Lines</a>
+      <nav class="flex shrink-0 items-center justify-end gap-x-3 text-sm font-medium text-slate-600">
+        {% if request.user.is_authenticated %}
+          <a href="{% url 'invoicer:week_select' %}" class="touch-manipulation rounded-lg px-1 py-1 text-emerald-700 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Week</a>
+          {% if request.session.invoice_week_monday %}
+            <a href="{% url 'invoicer:entries' %}" class="touch-manipulation rounded-lg px-1 py-1 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Lines</a>
+          {% endif %}
+          <a href="{% url 'invoicer:week_select' %}?reset=1" class="touch-manipulation rounded-lg px-1 py-1 text-slate-500 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Start over</a>
+          <div class="relative shrink-0">
+            <button
+              type="button"
+              id="profile-menu-button"
+              class="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 text-slate-600 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              {% if current_profile and current_profile.profile_photo %}
+                <img src="{{ current_profile.profile_photo.url }}" alt="Profile photo" class="h-8 w-8 rounded-full object-cover border border-slate-200">
+              {% else %}
+                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
+                  <i data-lucide="user-circle-2" class="h-5 w-5" aria-hidden="true"></i>
+                </span>
+              {% endif %}
+              <span class="hidden sm:inline text-xs">{{ request.user.username }}</span>
+            </button>
+            <div id="profile-menu" class="absolute right-0 mt-2 hidden w-40 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+              <a href="{% url 'invoicer:account_settings' %}" class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Settings</a>
+              <a href="{% url 'invoicer:invoice_history' %}" class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">History</a>
+              <a href="{% url 'invoicer:income_report' %}" class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Income</a>
+              <form method="post" action="{% url 'invoicer:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Logout</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <a href="{% url 'invoicer:login' %}" class="touch-manipulation rounded-lg px-1 py-1 text-emerald-700 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Login</a>
+          <a href="{% url 'invoicer:signup' %}" class="touch-manipulation rounded-lg px-1 py-1 text-slate-500 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Sign up</a>
         {% endif %}
-        <a href="{% url 'invoicer:week_select' %}?reset=1" class="touch-manipulation rounded-lg px-1 py-1 text-slate-500 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">Start over</a>
       </nav>
     </div>
     {% if messages %}
@@ -53,6 +85,21 @@
   <script defer>
     window.addEventListener("DOMContentLoaded", function () {
       if (typeof lucide !== "undefined") lucide.createIcons();
+      var btn = document.getElementById("profile-menu-button");
+      var menu = document.getElementById("profile-menu");
+      if (!btn || !menu) return;
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var isOpen = !menu.classList.contains("hidden");
+        menu.classList.toggle("hidden");
+        btn.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      });
+      document.addEventListener("click", function (e) {
+        if (!menu.classList.contains("hidden") && !menu.contains(e.target) && e.target !== btn) {
+          menu.classList.add("hidden");
+          btn.setAttribute("aria-expanded", "false");
+        }
+      });
     });
   </script>
 </body>

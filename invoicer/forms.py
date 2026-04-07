@@ -1,5 +1,10 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import UserCreationForm
 from django.utils import timezone
+
+from .models import AccountProfile
 
 # Tailwind utility classes (compiled into static/invoicer/css/app.css).
 _CONTROL = (
@@ -68,3 +73,142 @@ class DeliveryLineForm(forms.Form):
                 label = f"{d.strftime('%A')} {d.strftime('%d/%m/%Y')}"
                 choices.append((iso, label))
             self.fields["delivery_date"].choices = choices
+
+
+class SignupForm(UserCreationForm):
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(
+            attrs={
+                "class": _CONTROL,
+                "autocomplete": "email",
+                "placeholder": "you@example.com",
+            }
+        ),
+    )
+
+    class Meta(UserCreationForm.Meta):
+        model = get_user_model()
+        fields = ("username", "email")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["username"].widget.attrs.update(
+            {
+                "class": _CONTROL,
+                "autocomplete": "username",
+                "placeholder": "Choose a username",
+            }
+        )
+        self.fields["password1"].widget.attrs.update(
+            {
+                "class": _CONTROL,
+                "autocomplete": "new-password",
+                "placeholder": "Create a password",
+            }
+        )
+        self.fields["password2"].widget.attrs.update(
+            {
+                "class": _CONTROL,
+                "autocomplete": "new-password",
+                "placeholder": "Repeat password",
+            }
+        )
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        User = get_user_model()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("This email is already registered.")
+        return email
+
+
+class LoginForm(AuthenticationForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["username"].widget.attrs.update(
+            {
+                "class": _CONTROL,
+                "autocomplete": "username",
+                "placeholder": "Username",
+            }
+        )
+        self.fields["password"].widget.attrs.update(
+            {
+                "class": _CONTROL,
+                "autocomplete": "current-password",
+                "placeholder": "Password",
+            }
+        )
+
+
+class AccountProfileForm(forms.ModelForm):
+    class Meta:
+        model = AccountProfile
+        fields = (
+            "profile_photo",
+            "employer_name",
+            "employer_abn",
+            "contractor_name",
+            "contractor_abn",
+            "rate_per_parcel",
+            "bank_name",
+            "bsb_number",
+            "account_number",
+            "account_name",
+            "use_custom_mapping",
+            "map_data_first_row",
+            "map_data_last_row",
+            "map_sum_row",
+            "map_table_header_row",
+            "map_invoice_number_cell",
+            "map_rate_cell",
+            "map_employer_name_cell",
+            "map_employer_abn_cell",
+            "map_contractor_name_cell",
+            "map_contractor_abn_cell",
+            "map_contractor_name_line_cell",
+            "map_bank_name_cell",
+            "map_bsb_cell",
+            "map_account_number_cell",
+            "map_account_name_cell",
+            "map_total_label_cell",
+            "map_date_cell",
+        )
+        widgets = {
+            "profile_photo": forms.ClearableFileInput(attrs={"class": _CONTROL}),
+            "employer_name": forms.TextInput(attrs={"class": _CONTROL}),
+            "employer_abn": forms.TextInput(attrs={"class": _CONTROL}),
+            "contractor_name": forms.TextInput(attrs={"class": _CONTROL}),
+            "contractor_abn": forms.TextInput(attrs={"class": _CONTROL}),
+            "rate_per_parcel": forms.TextInput(
+                attrs={
+                    "class": f"{_CONTROL} no-spinner",
+                    "inputmode": "decimal",
+                    "autocomplete": "off",
+                    "placeholder": "e.g. 3",
+                }
+            ),
+            "bank_name": forms.TextInput(attrs={"class": _CONTROL}),
+            "bsb_number": forms.TextInput(attrs={"class": _CONTROL}),
+            "account_number": forms.TextInput(attrs={"class": _CONTROL}),
+            "account_name": forms.TextInput(attrs={"class": _CONTROL}),
+            "use_custom_mapping": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-slate-300"}),
+            "map_data_first_row": forms.NumberInput(attrs={"class": _CONTROL, "min": "1"}),
+            "map_data_last_row": forms.NumberInput(attrs={"class": _CONTROL, "min": "1"}),
+            "map_sum_row": forms.NumberInput(attrs={"class": _CONTROL, "min": "1"}),
+            "map_table_header_row": forms.NumberInput(attrs={"class": _CONTROL, "min": "1"}),
+            "map_invoice_number_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_rate_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_employer_name_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_employer_abn_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_contractor_name_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_contractor_abn_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_contractor_name_line_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_bank_name_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_bsb_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_account_number_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_account_name_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_total_label_cell": forms.TextInput(attrs={"class": _CONTROL}),
+            "map_date_cell": forms.TextInput(attrs={"class": _CONTROL}),
+        }
