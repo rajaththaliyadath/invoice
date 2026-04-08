@@ -4,13 +4,14 @@
 <div class="surface-card">
   <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Saved invoices</h1>
   <div class="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-    <table class="w-full min-w-[520px] text-left text-sm">
+    <table class="w-full min-w-[620px] text-left text-sm">
       <thead>
         <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
           <th class="px-3 py-2">Created</th>
           <th class="px-3 py-2">Week</th>
           <th class="px-3 py-2">Amount</th>
           <th class="px-3 py-2">Files</th>
+          <th class="px-3 py-2 text-right">Action</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100 bg-white">
@@ -24,9 +25,15 @@
               ·
               <a class="text-sky-700 hover:underline" href="{% url 'invoicer:download_job' i.job.public_id 'xlsx' %}">XLSX</a>
             </td>
+            <td class="px-3 py-2 text-right">
+              <form method="post" action="{% url 'invoicer:remove_saved_invoice' i.id %}" onsubmit="return confirm('Remove this invoice from history?');">
+                {% csrf_token %}
+                <button type="submit" class="rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">Remove</button>
+              </form>
+            </td>
           </tr>
         {% empty %}
-          <tr><td colspan="4" class="px-3 py-4 text-slate-500">No saved invoices yet.</td></tr>
+          <tr><td colspan="5" class="px-3 py-4 text-slate-500">No saved invoices yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

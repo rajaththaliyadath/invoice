@@ -156,6 +156,32 @@ class AccountProfileForm(forms.ModelForm):
             "bsb_number",
             "account_number",
             "account_name",
+        )
+        widgets = {
+            "profile_photo": forms.ClearableFileInput(attrs={"class": _CONTROL}),
+            "employer_name": forms.TextInput(attrs={"class": _CONTROL}),
+            "employer_abn": forms.TextInput(attrs={"class": _CONTROL}),
+            "contractor_name": forms.TextInput(attrs={"class": _CONTROL}),
+            "contractor_abn": forms.TextInput(attrs={"class": _CONTROL}),
+            "rate_per_parcel": forms.TextInput(
+                attrs={
+                    "class": f"{_CONTROL} no-spinner",
+                    "inputmode": "decimal",
+                    "autocomplete": "off",
+                    "placeholder": "e.g. 3",
+                }
+            ),
+            "bank_name": forms.TextInput(attrs={"class": _CONTROL}),
+            "bsb_number": forms.TextInput(attrs={"class": _CONTROL}),
+            "account_number": forms.TextInput(attrs={"class": _CONTROL}),
+            "account_name": forms.TextInput(attrs={"class": _CONTROL}),
+        }
+
+
+class MappingSettingsForm(forms.ModelForm):
+    class Meta:
+        model = AccountProfile
+        fields = (
             "use_custom_mapping",
             "map_data_first_row",
             "map_data_last_row",
@@ -176,23 +202,6 @@ class AccountProfileForm(forms.ModelForm):
             "map_date_cell",
         )
         widgets = {
-            "profile_photo": forms.ClearableFileInput(attrs={"class": _CONTROL}),
-            "employer_name": forms.TextInput(attrs={"class": _CONTROL}),
-            "employer_abn": forms.TextInput(attrs={"class": _CONTROL}),
-            "contractor_name": forms.TextInput(attrs={"class": _CONTROL}),
-            "contractor_abn": forms.TextInput(attrs={"class": _CONTROL}),
-            "rate_per_parcel": forms.TextInput(
-                attrs={
-                    "class": f"{_CONTROL} no-spinner",
-                    "inputmode": "decimal",
-                    "autocomplete": "off",
-                    "placeholder": "e.g. 3",
-                }
-            ),
-            "bank_name": forms.TextInput(attrs={"class": _CONTROL}),
-            "bsb_number": forms.TextInput(attrs={"class": _CONTROL}),
-            "account_number": forms.TextInput(attrs={"class": _CONTROL}),
-            "account_name": forms.TextInput(attrs={"class": _CONTROL}),
             "use_custom_mapping": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-slate-300"}),
             "map_data_first_row": forms.NumberInput(attrs={"class": _CONTROL, "min": "1"}),
             "map_data_last_row": forms.NumberInput(attrs={"class": _CONTROL, "min": "1"}),

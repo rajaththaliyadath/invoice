@@ -34,7 +34,7 @@ from .models import (
 from .pipeline import monday_of_week_au
 from .worker_spawn import spawn_invoice_job_process
 
-from .forms import AccountProfileForm, DeliveryLineForm, SignupForm, WeekAnchorForm
+from .forms import AccountProfileForm, DeliveryLineForm, MappingSettingsForm, SignupForm, WeekAnchorForm
 
 SESSION_WEEK = "invoice_week_monday"
 SESSION_ROWS = "invoice_rows"
@@ -157,6 +157,21 @@ def account_settings(request):
     else:
         form = AccountProfileForm(instance=profile)
     return render(request, "invoicer/account_settings.html", {"form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def advanced_settings(request):
+    profile = _get_or_create_profile(request.user)
+    if request.method == "POST":
+        form = MappingSettingsForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Advanced mapping settings updated.")
+            return redirect("invoicer:advanced_settings")
+    else:
+        form = MappingSettingsForm(instance=profile)
+    return render(request, "invoicer/advanced_settings.html", {"form": form})
 
 
 @login_required
@@ -407,6 +422,18 @@ def invoice_history(request):
 
 
 @login_required
+@require_http_methods(["POST"])
+def remove_saved_invoice(request, saved_id: int):
+    if request.user.is_staff:
+        saved = get_object_or_404(SavedInvoice, id=saved_id)
+    else:
+        saved = get_object_or_404(SavedInvoice, id=saved_id, owner=request.user)
+    saved.delete()
+    messages.success(request, "Removed from history.")
+    return redirect("invoicer:invoice_history")
+
+
+@login_required
 @require_http_methods(["GET"])
 def income_report(request):
     start = request.GET.get("start", "")
@@ -424,11 +451,12 @@ def income_report(request):
             qs = qs.filter(week_monday__lte=date.fromisoformat(end))
         except ValueError:
             pass
+    qs = qs.select_related("job").order_by("-created_at")
     total = sum(i.total_amount for i in qs)
     return render(
         request,
         "invoicer/income_report.html",
-        {"start": start, "end": end, "total": total, "count": qs.count()},
+        {"start": start, "end": end, "total": total, "count": qs.count(), "items": qs[:200]},
     )
 
 

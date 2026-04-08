@@ -1,16 +1,70 @@
 {% extends "invoicer/base.html" %}
 {% block title %}Income report{% endblock %}
 {% block content %}
-<div class="surface-card max-w-2xl">
-  <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Income report</h1>
-  <form method="get" class="mt-5 grid gap-3 sm:grid-cols-3">
-    <input type="date" name="start" value="{{ start }}" class="mt-1 block w-full min-h-[2.75rem] rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm">
-    <input type="date" name="end" value="{{ end }}" class="mt-1 block w-full min-h-[2.75rem] rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm">
-    <button type="submit" class="btn btn-primary">Calculate</button>
-  </form>
-  <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-    <p class="text-sm text-slate-700">Invoices: <span class="font-semibold">{{ count }}</span></p>
-    <p class="mt-1 text-sm text-slate-700">Total income: <span class="font-semibold tabular-nums">{{ total }}</span></p>
+<div class="space-y-6">
+  <div class="surface-card">
+    <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Income report</h1>
+    <p class="mt-2 text-sm text-slate-600">Pick a start and end date to calculate income and list matching invoices.</p>
+    <form method="get" class="mt-6 grid gap-3 sm:grid-cols-3">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Start date</label>
+        <input type="date" name="start" value="{{ start }}" class="mt-1 block w-full min-h-[2.75rem] rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">End date</label>
+        <input type="date" name="end" value="{{ end }}" class="mt-1 block w-full min-h-[2.75rem] rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm">
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="btn btn-primary w-full sm:w-auto">Calculate</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="surface-card">
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <p class="text-xs uppercase tracking-wide text-slate-500">Invoices</p>
+        <p class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ count }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <p class="text-xs uppercase tracking-wide text-slate-500">Total income</p>
+        <p class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ total }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface-card">
+    <h2 class="mb-4 text-lg font-semibold text-slate-900">Matching invoices</h2>
+    <div class="overflow-x-auto rounded-xl border border-slate-200">
+      <table class="w-full min-w-[560px] text-left text-sm">
+        <thead>
+          <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th class="px-3 py-2">Created</th>
+            <th class="px-3 py-2">Week</th>
+            <th class="px-3 py-2">Amount</th>
+            <th class="px-3 py-2">Downloads</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 bg-white">
+          {% for i in items %}
+            <tr>
+              <td class="px-3 py-2">{{ i.created_at|date:"d/m/Y H:i" }}</td>
+              <td class="px-3 py-2">{{ i.week_monday|date:"d/m/Y" }}</td>
+              <td class="px-3 py-2 tabular-nums">{{ i.total_amount }}</td>
+              <td class="px-3 py-2">
+                <a class="font-medium text-emerald-700 hover:underline" href="{% url 'invoicer:download_job' i.job.public_id 'pdf' %}">Download PDF</a>
+                <span class="mx-1 text-slate-400">|</span>
+                <a class="font-medium text-sky-700 hover:underline" href="{% url 'invoicer:download_job' i.job.public_id 'xlsx' %}">Download XLSX</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="px-3 py-4 text-slate-500">No invoices found for this date range.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 {% endblock %}
