@@ -2,7 +2,8 @@
 {% block title %}Advanced settings{% endblock %}
 {% block content %}
 <div class="surface-card max-w-3xl">
-  <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Advanced settings</h1>
+  <a href="{% url 'invoicer:account_settings' %}" class="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Back</a>
+  <h1 class="mt-3 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Advanced settings</h1>
   <p class="mt-2 text-sm text-slate-600">Custom template cell mapping and row layout options.</p>
   <form method="post" class="mt-6 space-y-5" novalidate>
     {% csrf_token %}
