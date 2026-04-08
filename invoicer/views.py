@@ -147,13 +147,19 @@ def signup(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def account_settings(request):
+    return render(request, "invoicer/settings_hub.html")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def profile_settings(request):
     profile = _get_or_create_profile(request.user)
     if request.method == "POST":
         form = AccountProfileForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
             form.save()
             messages.success(request, "Account settings updated.")
-            return redirect("invoicer:account_settings")
+            return redirect("invoicer:profile_settings")
     else:
         form = AccountProfileForm(instance=profile)
     return render(request, "invoicer/account_settings.html", {"form": form})
@@ -601,3 +607,15 @@ def download_job(request, public_id: UUID, kind: str):
             else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ),
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def preview_job(request, public_id: UUID):
+    job = _job_for_session(request, public_id)
+    if job.status != InvoiceJob.Status.DONE or not job.pdf_name:
+        raise Http404
+    path = Path(settings.INVOICE_OUTPUT_ROOT) / job.session_key / job.pdf_name
+    if not path.is_file():
+        raise Http404
+    return FileResponse(path.open("rb"), as_attachment=False, content_type="application/pdf")

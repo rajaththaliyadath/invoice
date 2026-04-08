@@ -4,13 +4,13 @@
 <div class="surface-card">
   <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Saved invoices</h1>
   <div class="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-    <table class="w-full min-w-[620px] text-left text-sm">
+      <table class="w-full min-w-[700px] text-left text-sm">
       <thead>
         <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
           <th class="px-3 py-2">Created</th>
           <th class="px-3 py-2">Week</th>
           <th class="px-3 py-2">Amount</th>
-          <th class="px-3 py-2">Files</th>
+          <th class="px-3 py-2">Invoice</th>
           <th class="px-3 py-2 text-right">Action</th>
         </tr>
       </thead>
@@ -21,9 +21,11 @@
             <td class="px-3 py-2">{{ i.week_monday|date:"d/m/Y" }}</td>
             <td class="px-3 py-2 tabular-nums">{{ i.total_amount }}</td>
             <td class="px-3 py-2">
-              <a class="text-emerald-700 hover:underline" href="{% url 'invoicer:download_job' i.job.public_id 'pdf' %}">PDF</a>
-              ·
-              <a class="text-sky-700 hover:underline" href="{% url 'invoicer:download_job' i.job.public_id 'xlsx' %}">XLSX</a>
+              <div class="flex flex-wrap items-center gap-2">
+                <a class="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50" href="{% url 'invoicer:preview_job' i.job.public_id %}" target="_blank" rel="noopener">Preview</a>
+                <a class="rounded-lg border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50" href="{% url 'invoicer:download_job' i.job.public_id 'pdf' %}">Download PDF</a>
+                <a class="rounded-lg border border-sky-200 px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50" href="{% url 'invoicer:download_job' i.job.public_id 'xlsx' %}">Download XLSX</a>
+              </div>
             </td>
             <td class="px-3 py-2 text-right">
               <form method="post" action="{% url 'invoicer:remove_saved_invoice' i.id %}" onsubmit="return confirm('Remove this invoice from history?');">

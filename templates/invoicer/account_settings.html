@@ -4,9 +4,6 @@
 <div class="surface-card max-w-2xl">
   <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Account settings</h1>
   <p class="mt-2 text-sm text-slate-600">These values are inserted into each invoice template.</p>
-  <p class="mt-2 text-sm text-slate-600">
-    Need custom cell mapping? <a href="{% url 'invoicer:advanced_settings' %}" class="font-semibold text-emerald-700 hover:text-emerald-800">Open Advanced settings</a>.
-  </p>
   {% if current_profile and current_profile.profile_photo %}
     <div class="mt-4">
       <img src="{{ current_profile.profile_photo.url }}" alt="Current profile photo" class="h-16 w-16 rounded-full object-cover border border-slate-200">

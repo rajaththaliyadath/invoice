@@ -19,6 +19,7 @@ urlpatterns = [
     ),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("account/settings/", views.account_settings, name="account_settings"),
+    path("account/profile-settings/", views.profile_settings, name="profile_settings"),
     path("account/advanced-settings/", views.advanced_settings, name="advanced_settings"),
     path("history/", views.invoice_history, name="invoice_history"),
     path("history/remove/<int:saved_id>/", views.remove_saved_invoice, name="remove_saved_invoice"),
@@ -34,5 +35,6 @@ urlpatterns = [
         views.download_job,
         name="download_job",
     ),
+    path("job/<uuid:public_id>/preview/", views.preview_job, name="preview_job"),
     path("done/", views.done, name="done"),
 ]

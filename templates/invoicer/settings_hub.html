@@ -1,0 +1,28 @@
+{% extends "invoicer/base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="surface-card">
+    <h1 class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Settings</h1>
+    <p class="mt-2 text-sm text-slate-600">Manage profile, advanced mapping, history, and income.</p>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <a href="{% url 'invoicer:profile_settings' %}" class="surface-card block hover:border-emerald-200">
+      <h2 class="text-lg font-semibold text-slate-900">Profile settings</h2>
+      <p class="mt-2 text-sm text-slate-600">Name, ABN, rate, bank details, and photo.</p>
+    </a>
+    <a href="{% url 'invoicer:advanced_settings' %}" class="surface-card block hover:border-emerald-200">
+      <h2 class="text-lg font-semibold text-slate-900">Advanced settings</h2>
+      <p class="mt-2 text-sm text-slate-600">Custom template cell and row mapping.</p>
+    </a>
+    <a href="{% url 'invoicer:invoice_history' %}" class="surface-card block hover:border-emerald-200">
+      <h2 class="text-lg font-semibold text-slate-900">History</h2>
+      <p class="mt-2 text-sm text-slate-600">Saved invoices, preview/download, and remove actions.</p>
+    </a>
+    <a href="{% url 'invoicer:income_report' %}" class="surface-card block hover:border-emerald-200">
+      <h2 class="text-lg font-semibold text-slate-900">Income report</h2>
+      <p class="mt-2 text-sm text-slate-600">Range-based totals and invoice list.</p>
+    </a>
+  </div>
+</div>
+{% endblock %}
